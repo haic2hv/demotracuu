@@ -109,7 +109,7 @@ export function SearchForm({ onResults, onError, onClear }: SearchFormProps) {
             </Label>
             <Input
               id="hoTen"
-              placeholder="Ví dụ: Nguyễn Văn A"
+              placeholder="Ví dụ: Nguyễn Văn An"
               value={hoTen}
               onChange={(e) => setHoTen(e.target.value)}
               maxLength={100}
