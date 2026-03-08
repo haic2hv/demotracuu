@@ -29,12 +29,110 @@ function sanitize(input: string): string {
     .slice(0, 100);
 }
 
+// Normalize Vietnamese text for better search accuracy
 function normalizeVietnamese(str: string): string {
-  return str
-    .toLowerCase()
-    .normalize("NFC")
-    .replace(/\s+/g, " ")
-    .trim();
+  // First, normalize to NFC form
+  let text = str.toLowerCase().normalize("NFD");
+
+  // Map of Vietnamese characters with diacritics to their base forms
+  const vietnameseMap: { [key: string]: string } = {
+    // Vowels with various diacritics
+    á: "a",
+    à: "a",
+    ả: "a",
+    ã: "a",
+    ạ: "a",
+    ă: "a",
+    ắ: "a",
+    ằ: "a",
+    ẳ: "a",
+    ẵ: "a",
+    ặ: "a",
+    â: "a",
+    ấ: "a",
+    ầ: "a",
+    ẩ: "a",
+    ẫ: "a",
+    ậ: "a",
+
+    é: "e",
+    è: "e",
+    ẻ: "e",
+    ẽ: "e",
+    ẹ: "e",
+    ê: "e",
+    ế: "e",
+    ề: "e",
+    ể: "e",
+    ễ: "e",
+    ệ: "e",
+
+    í: "i",
+    ì: "i",
+    ỉ: "i",
+    ĩ: "i",
+    ị: "i",
+
+    ó: "o",
+    ò: "o",
+    ỏ: "o",
+    õ: "o",
+    ọ: "o",
+    ô: "o",
+    ố: "o",
+    ồ: "o",
+    ổ: "o",
+    ỗ: "o",
+    ộ: "o",
+    ơ: "o",
+    ớ: "o",
+    ờ: "o",
+    ở: "o",
+    ỡ: "o",
+    ợ: "o",
+    òa: "oa", // Handle 'òa' → 'oa'
+    oà: "oa", // Handle both directions
+
+    ú: "u",
+    ù: "u",
+    ủ: "u",
+    ũ: "u",
+    ụ: "u",
+    ư: "u",
+    ứ: "u",
+    ừ: "u",
+    ử: "u",
+    ữ: "u",
+    ự: "u",
+
+    ý: "y",
+    ỳ: "y",
+    ỷ: "y",
+    ỹ: "y",
+    ỵ: "y",
+    thuỳ: "thuy", // Handle 'thuỳ' → 'thuy'
+    thùy: "thuy", // Handle 'thùy' → 'thuy'
+
+    đ: "d",
+  };
+
+  // Replace Vietnamese characters
+  text = text.replace(/./g, (char) => vietnameseMap[char] || char);
+
+  // Handle special multi-character replacements
+  text = text
+    .replace(/òa/g, "oa")
+    .replace(/oà/g, "oa")
+    .replace(/thuỳ/g, "thuy")
+    .replace(/thùy/g, "thuy");
+
+  // Remove combining diacritical marks (handles remaining diacritics)
+  text = text.replace(/[\u0300-\u036f]/g, "");
+
+  // Normalize whitespace
+  text = text.replace(/\s+/g, " ").trim();
+
+  return text;
 }
 
 function maskPhone(phone: string): string {
@@ -125,11 +223,21 @@ export async function POST(request: NextRequest) {
       const rowLop = normalizeVietnamese(row[1] || "");
       const rowPhone = (row[2] || "").replace(/\D/g, "");
 
-      return (
-        rowHoTen.includes(normalizedHoTen) &&
-        rowLop.includes(normalizedLop) &&
-        rowPhone.includes(soDienThoai)
-      );
+      // Improved matching: 
+      // - Name can be partial match (more flexible)
+      // - Class must match more strictly (word/part-word match)
+      // - Phone must be exact match
+      const nameMatches =
+        rowHoTen.includes(normalizedHoTen) ||
+        normalizedHoTen
+          .split(" ")
+          .some((part) => rowHoTen.includes(part));
+
+      const classMatches = rowLop === normalizedLop || rowLop.includes(normalizedLop);
+
+      const phoneMatches = rowPhone.includes(soDienThoai);
+
+      return nameMatches && classMatches && phoneMatches;
     });
 
     if (results.length === 0) {
